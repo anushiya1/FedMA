@@ -63,7 +63,7 @@ def evaluate(data_source):
     model.eval()
     total_loss = 0.
     ntokens = len(corpus.dictionary)
-    hidden = model.init_hidden(eval_batch_size)
+    hidden = model.init_hidden(eval_batch_size) # Anu: https://discuss.pytorch.org/t/when-to-call-init-hidden-for-rnn/11518
     
     with torch.no_grad():
         for i in range(0, data_source.size(0) - 1, args.bptt):
@@ -72,7 +72,7 @@ def evaluate(data_source):
                 output = model(data)
             else:
                 output, hidden = model(data, hidden)
-                hidden = repackage_hidden(hidden)
+                hidden = repackage_hidden(hidden) # Anu: https://discuss.pytorch.org/t/help-clarifying-repackage-hidden-in-word-language-model/226
             output_flat = output.view(-1, ntokens)
             total_loss += len(data) * criterion(output_flat, targets).item()
     return total_loss / (len(data_source) - 1)
@@ -83,7 +83,7 @@ def collect_weights(models):
     collected_weights = []
     for model_index, model in enumerate(models):
         param_vals = []
-        for param_index, (name, param) in enumerate(model.named_parameters()):
+        for param_index, (name, param) in enumerate(model.named_parameters()):  # Anu: for .named_parameters() check https://pytorch.org/docs/stable/generated/torch.nn.Module.html
             logger.info("Layer index: {}, Layer name: {}, Layer shape: {}".format(param_index, name, param.size()))
             param_vals.append(param.cpu().detach().numpy())
         collected_weights.append(param_vals)
