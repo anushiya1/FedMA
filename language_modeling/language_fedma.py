@@ -16,7 +16,8 @@ logger.setLevel(logging.INFO)
 
 
 def row_param_cost(global_weights, weights_j_l, global_sigmas, sigma_inv_j):
-
+    
+    ### AA: This looks like Equation 6 in 2019 PFNM paper. sum(axis=1) means it is summing up the elements from each column this way ---> 
     match_norms = ((weights_j_l + global_weights) ** 2 / (sigma_inv_j + global_sigmas)).sum(axis=1) - (
                 global_weights ** 2 / global_sigmas).sum(axis=1)
 
@@ -29,10 +30,11 @@ def compute_cost(global_weights, weights_j, global_sigmas, sigma_inv_j, prior_me
     Lj = weights_j.shape[0]
     counts = np.minimum(np.array(popularity_counts), 10)
     param_cost = np.array([row_param_cost(global_weights, weights_j[l], global_sigmas, sigma_inv_j) for l in range(Lj)])
-    param_cost += np.log(counts / (J - counts))
+    param_cost += np.log(counts / (J - counts)) ###AA: !! Why dont have 2*np.log(counts / (J - counts)) as in  Equation 8?
+    
 
     ## Nonparametric cost
-    L = global_weights.shape[0]
+    L = global_weights.shape[0] ###AA: shape of weights gives tuple (no. neurons, no.of features)
     max_added = min(Lj, max(700 - L, 1))
     nonparam_cost = np.outer((((weights_j + prior_mean_norm) ** 2 / (prior_inv_sigma + sigma_inv_j)).sum(axis=1) - (
                 prior_mean_norm ** 2 / prior_inv_sigma).sum()), np.ones(max_added))
@@ -77,7 +79,7 @@ def matching_upd_j(weights_j, global_weights, sigma_inv_j, global_sigmas, prior_
 
 
 def objective(global_weights, global_sigmas):
-    obj = ((global_weights) ** 2 / global_sigmas).sum()
+    obj = ((global_weights) ** 2 / global_sigmas).sum() #AA: LHS of Equation 6 in 2019 paper but has a 1/2 missing?
     return obj
 
 
