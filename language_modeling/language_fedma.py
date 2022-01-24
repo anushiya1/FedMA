@@ -28,7 +28,7 @@ def compute_cost(global_weights, weights_j, global_sigmas, sigma_inv_j, prior_me
                  popularity_counts, gamma, J):
 
     Lj = weights_j.shape[0]
-    counts = np.minimum(np.array(popularity_counts), 10)
+    counts = np.minimum(np.array(popularity_counts), 10) #AA: Why 10?
     param_cost = np.array([row_param_cost(global_weights, weights_j[l], global_sigmas, sigma_inv_j) for l in range(Lj)])
     param_cost += np.log(counts / (J - counts)) ###AA: !! Why dont have 2*np.log(counts / (J - counts)) as in  Equation 8?
     
@@ -42,7 +42,7 @@ def compute_cost(global_weights, weights_j, global_sigmas, sigma_inv_j, prior_me
     nonparam_cost -= cost_pois
     nonparam_cost += 2 * np.log(gamma / J)
 
-    full_cost = np.hstack((param_cost, nonparam_cost))
+    full_cost = np.hstack((param_cost, nonparam_cost)) ##AA: hstack() function is used to stack the sequence of input arrays horizontally (i.e. column wise) to make a single array. 
     return full_cost
 
 
@@ -54,24 +54,28 @@ def matching_upd_j(weights_j, global_weights, sigma_inv_j, global_sigmas, prior_
     full_cost = compute_cost(global_weights, weights_j, global_sigmas, sigma_inv_j, prior_mean_norm, prior_inv_sigma,
                              popularity_counts, gamma, J)
 
-    #row_ind, col_ind = linear_sum_assignment(-full_cost)
+    #row_ind, col_ind = linear_sum_assignment(-full_cost) #AA: This function was used in 2019 paper code to get linear assignments
     # please note that this can not run on non-Linux systems
-    row_ind, col_ind = solve_dense(-full_cost)
-
+    row_ind, col_ind = solve_dense(-full_cost) ### AA: gives the "sorted and matched" row index (of weights) and column index (of costs) pair that gives the lowest total cost 
+                                               ## AA: See example: https://github.com/cheind/py-lapsolver
     assignment_j = []
 
     new_L = L
 
-    for l, i in zip(row_ind, col_ind):
-        if i < L:
-            popularity_counts[i] += 1
-            assignment_j.append(i)
-            global_weights[i] += weights_j[l]
-            global_sigmas[i] += sigma_inv_j
+    for l, i in zip(row_ind, col_ind): ##AA: l: index of local weight, i: index of global weight
+        if i < L: #AA: if index i is less than total global weights
+            popularity_counts[i] += 1 # AA: Add 1 to the popularity count at index i
+            assignment_j.append(i) #AA: append index of matched global weight
+            
+            ##AA: Refer to first half of RHS of Eq 6; numerator is global_weights + weights_j, denominator is global_sigmas + sigma_inv_j
+            global_weights[i] += weights_j[l] 
+            global_sigmas[i] += sigma_inv_j  
         else:  # new neuron
-            popularity_counts += [1]
-            assignment_j.append(new_L)
+            popularity_counts += [1] #AA: Append a '1' to the current list, this will create a new last position
+            assignment_j.append(new_L) #AA: Once i> L, append the new_L value which will be the index value when appended to assignment_j
             new_L += 1
+            
+            ##AA: Refer to second half of RHS of Eq 6; numerator is global_weights, denominator is global_sigmas, although I am not sure what role that plays below
             global_weights = np.vstack((global_weights, prior_mean_norm + weights_j[l]))
             global_sigmas = np.vstack((global_sigmas, prior_inv_sigma + sigma_inv_j))
 
@@ -94,10 +98,12 @@ def patch_weights(w_j, L_next, assignment_j_c):
 def split_weights(weight):
     '''
     we reconstruct the w_ii|w_io|w_ig|w_if matrices here
+    
+    #AA: the vertically stacked w_ii|w_io|w_ig|w_if will be reconstructed to horizontally stacked.
     '''
-    split_range = np.split(np.arange(weight.shape[0]), 4)
+    split_range = np.split(np.arange(weight.shape[0]), 4) #AA:The total number of neurons will be split by 4, and corresponding subarrays with split range will be created
     i_weights = [weight[indices, :] for indices in split_range]
-    return np.hstack(i_weights)
+    return np.hstack(i_weights) 
 
 
 def split_bias(bias):
@@ -125,7 +131,7 @@ def process_softmax_bias(batch_weights, last_layer_const, sigma, sigma0):
     sigma_bias = sigma
     sigma0_bias = sigma0
     mu0_bias = 0.1
-    softmax_bias = [batch_weights[j][-1] for j in range(J)]
+    softmax_bias = [batch_weights[j][-1] for j in range(J)] # AA: Taking the last row of weights matrix gives the bias of softmax layer
     softmax_inv_sigma = [s / sigma_bias for s in last_layer_const]
     softmax_bias = sum([b * s for b, s in zip(softmax_bias, softmax_inv_sigma)]) + mu0_bias / sigma0_bias
     softmax_inv_sigma = 1 / sigma0_bias + sum(softmax_inv_sigma)
@@ -134,8 +140,9 @@ def process_softmax_bias(batch_weights, last_layer_const, sigma, sigma0):
 
 def match_layer(weights_bias, sigma_inv_layer, mean_prior, sigma_inv_prior, gamma, it):
     J = len(weights_bias)
-
-    group_order = sorted(range(J), key=lambda x: -weights_bias[x].shape[0])
+    
+    #AA: On how to use built-in sorted() function with key attribute https://www.programiz.com/python-programming/methods/built-in/sorted
+    group_order = sorted(range(J), key=lambda x: -weights_bias[x].shape[0]) #AA: This sorts index of J from one with largest negative number (hence smallest value) to lowest negative number (hence largest value)?? Does it??
 
     batch_weights_norm = [w * s for w, s in zip(weights_bias, sigma_inv_layer)]
     prior_mean_norm = mean_prior * sigma_inv_prior
@@ -161,7 +168,7 @@ def match_layer(weights_bias, sigma_inv_layer, mean_prior, sigma_inv_prior, gamm
 
     ## Iterate over groups
     for iteration in range(it):
-        random_order = np.random.permutation(J)
+        random_order = np.random.permutation(J) #AA: Randomly permute a sequence, or return a permuted range
         for j in random_order:  # random_order:
             to_delete = []
             ## Remove j
@@ -206,7 +213,7 @@ def layerwise_fedma(batch_weights, layer_index, sigma_layers,
     We implement a layer-wise matching here:
     """
     if type(sigma_layers) is not list:
-        sigma_layers = (n_layers - 1) * [sigma_layers]
+        sigma_layers = (n_layers - 1) * [sigma_layers] #AA: Repeats the contents of [sigma_layers] 'n_layers - 1' times. E.g. if n_layers - 1 =2, then list [1,2] becomes [1,2,1,2]
     if type(sigma0_layers) is not list:
         sigma0_layers = (n_layers - 1) * [sigma0_layers]
     if type(gamma_layers) is not list:
@@ -223,38 +230,38 @@ def layerwise_fedma(batch_weights, layer_index, sigma_layers,
     assignment_c = [None for j in range(J)]
     L_next = None
 
-    sigma = sigma_layers[layer_index - 1]
+    sigma = sigma_layers[layer_index - 1]  #AA: going top-bottom of layers? The larger the layer index, the closer it is to the output layer
     sigma_bias = sigma_bias_layers[layer_index - 1]
     gamma = gamma_layers[layer_index - 1]
     sigma0 = sigma0_layers[layer_index - 1]
     sigma0_bias = sigma0_bias_layers[layer_index - 1]
 
-    if layer_index < 1:
-        sentence_length = batch_weights[0][layer_index].T.shape[1]
+    if layer_index < 1: #AA: layer_index=0 is the input layer
+        sentence_length = batch_weights[0][layer_index].T.shape[1] # AA: This is actually calculating the input size (no. of features)
         weights_bias = [batch_weights[j][layer_index].T for j in range(J)]
 
         sigma_inv_prior = np.array(sentence_length * [1 / sigma0])
         mean_prior = np.array(sentence_length * [mu0])
         sigma_inv_layer = [np.array(sentence_length * [1 / sigma]) for j in range(J)]
 
-    elif layer_index == (n_layers - 1) and n_layers > 2:
+    elif layer_index == (n_layers - 1) and n_layers > 2: ##AA: Second last layer 
         # our assumption is that this branch will consistently handle the last fc layers
         reconstructed_weights = [split_weights(batch_weights[j][layer_index]) for j in range(J)]
-        reconstructed_bias = [split_bias(batch_weights[j][layer_index+2]) for j in range(J)]
+        reconstructed_bias = [split_bias(batch_weights[j][layer_index+2]) for j in range(J)] #AA: E.g. if hidden-to-hidden weight is in layer index =2, the hidden-to-hidden bias will be in the layer index =2+2
         weights_bias = [np.hstack((reconstructed_weights[j], reconstructed_bias[j])) for j in range(J)]
 
         sigma_inv_prior = np.array((weights_bias[0].shape[1] - 4) * [1 / sigma0] + [1 / sigma0_bias] * 4)
         mean_prior = np.array((weights_bias[0].shape[1] - 4) * [mu0] + [mu0_bias] * 4)
         sigma_inv_layer = [np.array((weights_bias[0].shape[1] - 4) * [1 / sigma] + [1 / sigma_bias] * 4) for j in range(J)]
 
-    elif (layer_index >= 1 and layer_index < (n_layers - 1)):
+    elif (layer_index >= 1 and layer_index < (n_layers - 1)): ##AA: All remaining layers
         # our assumption is that this branch will consistently handle the last fc layers
         if layer_index == 1:
             reconstructed_weights = [split_weights(batch_weights[j][layer_index]) for j in range(J)]
             reconstructed_bias = [split_bias(batch_weights[j][layer_index+2]) for j in range(J)]
             weights_bias = [np.hstack((reconstructed_weights[j], reconstructed_bias[j])) for j in range(J)]
         elif layer_index == 2:
-            reconstructed_weights = [split_weights(batch_weights[j][layer_index+3]) for j in range(J)]
+            reconstructed_weights = [split_weights(batch_weights[j][layer_index+3]) for j in range(J)] 
             reconstructed_bias = [split_bias(batch_weights[j][layer_index+3+2]) for j in range(J)]
             weights_bias = [np.hstack((reconstructed_weights[j], reconstructed_bias[j])) for j in range(J)]           
 
