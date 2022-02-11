@@ -56,7 +56,7 @@ def matching_upd_j(weights_j, global_weights, sigma_inv_j, global_sigmas, prior_
 
     #row_ind, col_ind = linear_sum_assignment(-full_cost) #AA: This function was used in 2019 paper code to get linear assignments
     # please note that this can not run on non-Linux systems
-    row_ind, col_ind = solve_dense(-full_cost) ### AA: gives the "sorted and matched" row index (of weights) and column index (of costs) pair that gives the lowest total cost 
+    row_ind, col_ind = solve_dense(-full_cost) ### AA: gives the "sorted and matched" row index (of local weights) and column index (of global weights ??) pair that gives the lowest total cost 
                                                ## AA: See example: https://github.com/cheind/py-lapsolver
     assignment_j = []
 
@@ -150,7 +150,7 @@ def match_layer(weights_bias, sigma_inv_layer, mean_prior, sigma_inv_prior, gamm
     global_weights = prior_mean_norm + batch_weights_norm[group_order[0]]
     global_sigmas = np.outer(np.ones(global_weights.shape[0]), sigma_inv_prior + sigma_inv_layer[group_order[0]])
 
-    popularity_counts = [1] * global_weights.shape[0]
+    popularity_counts = [1] * global_weights.shape[0] #AA:  e.g. [1] * 5 is [1, 1, 1, 1, 1]
 
     assignment = [[] for _ in range(J)]
 
