@@ -75,7 +75,7 @@ def evaluate(data_source):
                 hidden = repackage_hidden(hidden) # Anu: https://discuss.pytorch.org/t/help-clarifying-repackage-hidden-in-word-language-model/226
             output_flat = output.view(-1, ntokens)
             total_loss += len(data) * criterion(output_flat, targets).item()
-    return total_loss / (len(data_source) - 1)
+    return total_loss / (len(data_source) - 1) ##AA: As to why it is -1 check out: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
 
 
 def collect_weights(models):
@@ -360,7 +360,7 @@ if __name__ == "__main__":
     nets_list = []
     criterion = nn.CrossEntropyLoss()
 
-    for client_index in range(n_clients):
+    for client_index in range(n_clients): ##AA: I believe this section is to train the local client model once if retrain_flag is true or load from trained model if retrain_flag is false. After this local model training, we can choose to do either FedAvg, FedProx or FedMA
         if retrain_flag:
             logger.info("Start local training process for client {} ....".format(client_index))
             client_user_name = TRIAL_USER_NAME[client_index]
@@ -518,7 +518,7 @@ if __name__ == "__main__":
             assignments_list.append(assignments)
 
             if i == 0:
-                avg_encoding_weights = np.zeros(matched_weights[0].T.shape) # (80, 8)
+                avg_encoding_weights = np.zeros(matched_weights[0].T.shape) # (80, 8) #AA: (no. of tokens, no. of inputs)
                 for client_index in range(n_clients):
                     #avg_encoding_weights += 1/2 * patch_weights(collected_weights[client_index][0], next_layer_shape, assignments[client_index])
                     avg_encoding_weights += patch_weights(collected_weights[client_index][0], next_layer_shape, assignments[client_index])
